@@ -31,7 +31,13 @@ jobs:
         run: |
           mkdir -p music
           touch downloaded.txt
-
+      
+      - name: Create YouTube cookies
+        env:
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+        run: |
+          printf '%s' "$YOUTUBE_COOKIES" > cookies.txt
+          
       - name: Get channel videos
         env:
           CHANNEL_URL: "https://www.youtube.com/@NavjaxxOfficial/videos"
@@ -61,6 +67,7 @@ jobs:
             echo "New video found: $ID"
 
             yt-dlp \
+              --cookies cookies.txt
               --extract-audio \
               --audio-format mp3 \
               --audio-quality 0 \
