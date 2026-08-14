@@ -49,6 +49,7 @@ jobs:
         run: |
           yt-dlp \
             --flat-playlist \
+            --remote-components ejs:github \
             --print "%(id)s" \
             "$CHANNEL_URL" \
             > current_ids.txt
@@ -73,6 +74,7 @@ jobs:
 
             yt-dlp \
               --cookies cookies.txt \
+              --remote-components ejs:github \
               --extract-audio \
               --audio-format mp3 \
               --audio-quality 0 \
