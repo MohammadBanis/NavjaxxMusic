@@ -67,7 +67,7 @@ jobs:
             echo "New video found: $ID"
 
             yt-dlp \
-              --cookies cookies.txt
+              --cookies cookies.txt \
               --extract-audio \
               --audio-format mp3 \
               --audio-quality 0 \
