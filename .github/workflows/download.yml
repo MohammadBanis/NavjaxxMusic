@@ -1,0 +1,135 @@
+name: YouTube Music Archiver
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # Run every hour
+    - cron: "0 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install yt-dlp
+        run: |
+          python -m pip install --upgrade yt-dlp
+
+      - name: Create directories
+        run: |
+          mkdir -p music
+          touch downloaded.txt
+
+      - name: Get channel videos
+        env:
+          CHANNEL_URL: "https://www.youtube.com/@YOUR_CHANNEL/videos"
+        run: |
+          yt-dlp \
+            --flat-playlist \
+            --print "%(id)s" \
+            "$CHANNEL_URL" \
+            > current_ids.txt
+
+          echo "Videos found:"
+          cat current_ids.txt
+
+      - name: Download new audio
+        run: |
+          while IFS= read -r ID; do
+
+            # Skip empty lines
+            [ -z "$ID" ] && continue
+
+            # Skip videos that were already downloaded
+            if grep -Fxq "$ID" downloaded.txt; then
+              echo "Already downloaded: $ID"
+              continue
+            fi
+
+            echo "New video found: $ID"
+
+            yt-dlp \
+              --extract-audio \
+              --audio-format mp3 \
+              --audio-quality 0 \
+              --no-playlist \
+              --output "music/%(title)s.%(ext)s" \
+              "https://www.youtube.com/watch?v=$ID"
+
+            # Only mark it as downloaded if yt-dlp succeeded
+            if [ $? -eq 0 ]; then
+              echo "$ID" >> downloaded.txt
+              echo "Successfully downloaded: $ID"
+            else
+              echo "Failed to download: $ID"
+            fi
+
+          done < current_ids.txt
+
+      - name: Commit download database
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add downloaded.txt
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update downloaded video database"
+            git push
+          else
+            echo "No database changes."
+          fi
+
+      - name: Get release information
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view music-archive >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create release
+        if: steps.release.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create music-archive \
+            --title "Music Archive" \
+            --notes "Automatically archived music from the YouTube channel."
+
+      - name: Upload new MP3 files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+
+          files=(music/*.mp3)
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No new MP3 files to upload."
+            exit 0
+          fi
+
+          for file in "${files[@]}"; do
+            echo "Uploading: $file"
+
+            gh release upload \
+              music-archive \
+              "$file" \
+              --clobber
+          done
