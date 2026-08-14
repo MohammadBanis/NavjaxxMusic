@@ -34,7 +34,7 @@ jobs:
 
       - name: Get channel videos
         env:
-          CHANNEL_URL: "https://www.youtube.com/@YOUR_CHANNEL/videos"
+          CHANNEL_URL: "https://www.youtube.com/@NavjaxxOfficial/videos"
         run: |
           yt-dlp \
             --flat-playlist \
